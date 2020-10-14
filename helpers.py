@@ -28,6 +28,52 @@ def filter_dict(d0, args):
 def now_timestamp():
     return calendar.timegm(time.gmtime())
 
+def output_text(args, text = ""):
+    if args.csv:
+        return
+    print(text)
+
+def output_list(args, list):
+    for item in list:
+        if args.csv:
+            print(item)
+        else:
+            print(f"  {item}")
+
+def output_data(args, headers, data):
+    n = len(headers)
+    width = [0] * n
+
+    # Max header width
+    for i in range(n):
+        width[i] = max(width[i], len(str(headers[i])))
+
+    count = 0
+
+    if args.csv:
+        # Output csv
+        for i in range(n):
+            print(headers[i], end="," if i < n-1 else "\n")
+        for item in data:
+            count += 1
+            for i in range(n):
+                print(item[i], end="," if i < n-1 else "\n")
+    else:
+        items = list(data)
+        # Max item width
+        for item in items:
+            for i in range(n):
+                width[i] = max(width[i], len(str(item[i])))
+        # Output in columns
+        for i in range(n):
+            print("{0: <{width}}".format(headers[i], width=width[i]), end=" " if i < n-1 else "\n")
+        for item in items:
+            count += 1
+            for i in range(n):
+                print("{0: <{width}}".format(item[i], width=width[i]), end=" " if i < n-1 else "\n")
+    
+    return count
+
 class Input(object):
     def __init__(self, item, type, amount, rps):
         self.item = item

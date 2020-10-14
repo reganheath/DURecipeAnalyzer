@@ -5,6 +5,7 @@ from collections import defaultdict
 #from container import Container
 from recipe import load_recipes, save_recipes
 from helpers import filter_dict, nextid, getid, Input, Output, now_timestamp
+from helpers import output_text, output_data, output_list
 
 class RecipeAnalyzer(object):
     def __init__(self, consider_all=False):
@@ -89,24 +90,22 @@ class RecipeAnalyzer(object):
         keys = list(items.keys())
         keys.sort()
         
-        count = 0
-        print(f"  {type:<42} {'Tier':<4} {'Industry':<30}")
-        for key in keys:
+        def output_item(key):
             item = items[key]
             machine = item.industry_unit("NA")
-            print(f"  {item.name:<42} {item.tier:<4} {machine:<30}")
-            count += 1
-        
-        print(f"{count} {type}s")
+            return (item.name, item.tier, machine)
+
+        count = output_data(args, ["Type", "Tier", "Industry"], map(output_item, keys))
+        output_text(args, f"{count} {type}s")
 
     def list_recipes(self, args):
         self.list_items(self.recipes, "Recipe", args)
 
     def list_ingredients(self, args):
-        self.list_items(self.ingredients, "Ingredients", args)
+        self.list_items(self.ingredients, "Ingredient", args)
 
     def list_products(self, args):
-        self.list_items(self.products, "Products", args)
+        self.list_items(self.products, "Product", args)
 
     def ingredient_frequency(self, args):
         freq = defaultdict(lambda: 0)
@@ -116,42 +115,50 @@ class RecipeAnalyzer(object):
 
         data = list(filter(lambda e: e[1] > 1, [(k, v) for k, v in freq.items()]))
         data.sort(key=lambda x: x[1])
-       
-        print("Ingredient frequency (>1):")
-        print(f"  {'Freq':<4} {'Product':<42} {'Tier':<4} {'Industry':<30}")
-        for k, v in data:
-            recipe = self.recipes[k]
+
+        def filter_item(tup):
+            recipe = self.recipes[tup[0]]
             if args.tier and recipe.tier < args.tier:
-                continue
+                return False
+            return True
+
+        def output_item(tup):
+            recipe = self.recipes[tup[0]]
             machine = recipe.industry_unit()
-            print(f"  {v:<4} {k:<42} {recipe.tier:<4} {machine:<30}")
+            return (tup[1], tup[0], recipe.tier, machine)
+
+        output_text(args, "Ingredient frequency (>1):")
+        output_data(args, ["Freq", "Product", "Tier", "Industry"], map(output_item, filter(filter_item, data)))
 
     def list_inputs(self, args):
         for machine in self.machines:
+            if args.match and machine.find(args.match) == -1:
+                continue
             ingredients = set()
             for _, recipe in filter(lambda r: r[1].industry_unit() == machine, self.recipes.items()):
                 if args.tier and recipe.tier > args.tier:
                     continue
                 for ingredient in recipe.input:
                     ingredients.add(ingredient)
-            print(f"Ingredients required by {machine} = {len(ingredients)}:")
-            for ingredient in sorted(ingredients):
-                print(f"  {ingredient}")
-            print()
+            output_text(args, f"Ingredients required by {machine} = {len(ingredients)}:")
+            output_list(args, sorted(ingredients))
+            output_text(args)
 
     def ingredient_usage(self, args):
-        count = 0
-        print(f"{args.ingredient} used in:")
-        print(f"  {'Recipe':<42} {'Tier':<4} {'Industry':<30}")
-        for _, recipe in self.recipes.items():
-            if args.ingredient not in recipe.input:
-                continue
-            machine = recipe.industry_unit()
+        def filter_item(tup):
+            if args.ingredient not in tup[1].input:
+                return False
+            machine = tup[1].industry_unit()
             if args.industry and machine.find(args.industry) == -1:
-                continue
-            print(f"  {recipe.name:<42} {recipe.tier:<4} {machine:<30}")
-            count += 1
-        print(f"{count} recipes")
+                return False
+            return True
+
+        def output_item(tup):
+            return (tup[1].name, tup[1].tier, tup[1].industry_unit())
+
+        output_text(args, f"{args.ingredient} used in:")
+        count = output_data(args, ["Recipe", "Tier", "Industry"], map(output_item, filter(filter_item, self.recipes.items())))
+        output_text(args, f"{count} recipes")
 
     def show_consumers(self, args):
         inputs = defaultdict(lambda: 0)
@@ -164,7 +171,7 @@ class RecipeAnalyzer(object):
             inputs[machine] += 1
 
         if len(inputs) == 0:
-            print(f"Ingredient {args.ingredient} not found")
+            output_text(args, f"Ingredient {args.ingredient} not found")
             return
 
         data = []
@@ -172,14 +179,9 @@ class RecipeAnalyzer(object):
             data.append((k,v))
         data.sort(key=lambda x: x[1])
 
-        count = 0
-        print(f"{args.ingredient} as input for:")
-        print(f"  {'Recipes':<7} {'Industry':<30}")
-        for k, v in data:
-            print(f"  {v:<7} {k:<30}")
-            count += v
-
-        print(f"{count} recipes (+assemblies)")
+        output_text(args, f"{args.ingredient} as input for:")
+        count = output_data(args, ["Recipes", "Industry"], map(lambda tup: (tup[1], tup[0]), data))
+        output_text(args, f"{count} recipes (+assemblies)")
 
     def update_prices(self, args):
         if args.next:
@@ -265,7 +267,8 @@ class RecipeAnalyzer(object):
         industry = defaultdict(lambda: 0)
         for _, product in self.production.items():
             industry[product.machine] += product.machine_count
-        if args.csv: # WIP csv should apply to all commands
+
+        if args.csv:
             print("Count,Machine,Item")
             for machine, count in industry.items():
                 print(f"{count},{machine}")
