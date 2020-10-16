@@ -29,5 +29,11 @@ WIP. Produce a Mermaid diagram (see https://github.com/mermaid-js/mermaid) which
 #### factory (fa)
 WIP. Calculate the required industry units to produce all items listed in production.json (a dictionary of `item: count` keys).
 
+##### todo
+- Count consumers and determine container requirements
+
+##### Known issue(s)
+- Output includes recyclers when it gets all the Hydrogen/Oxygen it needs from Refiners
+
 #### prices (price)
 WIP. Provide scriptable hooks for collecting current market prices for each item so that future commands can be added to analyze benefits of selling ore and buying items vs investment in industry etc.
